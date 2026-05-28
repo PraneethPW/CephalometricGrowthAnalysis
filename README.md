@@ -101,6 +101,18 @@ Backend:
 http://localhost:8787
 ```
 
+Deployed frontend:
+
+```txt
+https://cephalometric-growth-analysis.vercel.app/
+```
+
+Deployed backend:
+
+```txt
+https://cephalometricgrowthanalysis-production.up.railway.app/
+```
+
 ## Frontend Pages
 
 ```txt
@@ -122,7 +134,7 @@ Backend environment lives in `backend/.env`.
 ```env
 PORT=8787
 NODE_ENV=development
-CLIENT_ORIGIN=http://localhost:5173,http://localhost:5174
+CLIENT_ORIGIN=http://localhost:5173,http://localhost:5174,http://localhost:5176,https://cephalometric-growth-analysis.vercel.app
 APP_URL=http://localhost:5173
 DATABASE_URL=postgresql://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require
 OPENROUTER_API_KEY=sk-or-v1-your-key
@@ -133,6 +145,19 @@ Frontend environment lives in `frontend/.env`.
 
 ```env
 VITE_API_URL=http://localhost:8787
+```
+
+For deployed frontend builds, use:
+
+```env
+VITE_API_URL=https://cephalometricgrowthanalysis-production.up.railway.app
+```
+
+For deployed backend builds, use:
+
+```env
+CLIENT_ORIGIN=https://cephalometric-growth-analysis.vercel.app
+APP_URL=https://cephalometric-growth-analysis.vercel.app
 ```
 
 If `DATABASE_URL` or `OPENROUTER_API_KEY` is empty, the API runs in demo mode.

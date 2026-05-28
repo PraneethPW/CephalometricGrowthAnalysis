@@ -20,7 +20,7 @@ const openRouter = process.env.OPENROUTER_API_KEY
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
       defaultHeaders: {
-        'HTTP-Referer': process.env.APP_URL ?? 'http://localhost:5173',
+        'HTTP-Referer': process.env.APP_URL ?? 'https://cephalometric-growth-analysis.vercel.app',
         'X-Title': 'CephGrow AI',
       },
     })
@@ -90,11 +90,18 @@ async function generateSummary(angle: number, growthClass: GrowthClass) {
 }
 
 app.use(helmet())
-const allowedOrigins = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173,http://localhost:5174')
-  .split(',')
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5176',
+  'https://cephalometric-growth-analysis.vercel.app',
+  ...(process.env.CLIENT_ORIGIN ?? '').split(','),
+]
+  .filter(Boolean)
   .map((origin) => origin.trim())
+const uniqueAllowedOrigins = [...new Set(allowedOrigins)]
 
-app.use(cors({ origin: allowedOrigins }))
+app.use(cors({ origin: uniqueAllowedOrigins }))
 app.use(express.json())
 app.use(morgan('dev'))
 
