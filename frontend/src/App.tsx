@@ -4,6 +4,7 @@ import { Float, OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { motion } from 'framer-motion'
 import {
   Activity,
+  AlertCircle,
   ArrowRight,
   BarChart3,
   Brain,
@@ -14,6 +15,7 @@ import {
   FolderOpen,
   Home,
   LineChart,
+  Loader2,
   Lock,
   LogOut,
   Microscope,
@@ -23,6 +25,7 @@ import {
   Sparkles,
   Upload,
   UserPlus,
+  Wand2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -51,6 +54,22 @@ type CaseRecord = {
 type User = {
   name: string
   email: string
+}
+
+type AnalysisResult = {
+  id: string
+  patientName: string
+  imageName: string
+  angle: string | number
+  growthClass: GrowthClass
+  confidence: number
+  aiSummary: string
+  createdAt: string
+}
+
+type GeneratedVisualProps = {
+  imageSrc: string
+  result: AnalysisResult
 }
 
 type AuthContextValue = {
@@ -625,11 +644,55 @@ function UploadPage() {
   const [selectedCase, setSelectedCase] = useState(cases[0])
   const [angle, setAngle] = useState(34)
   const [preview, setPreview] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [patientName, setPatientName] = useState('New patient')
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState('')
   const predictedClass = useMemo(() => classify(angle), [angle])
+  const resultAngle = analysisResult ? Number(analysisResult.angle) : angle
+  const resultClass = analysisResult?.growthClass ?? predictedClass
+  const apiBaseUrl = window.location.hostname === 'localhost' ? '' : import.meta.env.VITE_API_URL || ''
 
   const handleFile = (file: File | undefined) => {
     if (!file) return
+    if (preview) URL.revokeObjectURL(preview)
+    setSelectedFile(file)
     setPreview(URL.createObjectURL(file))
+    setAnalysisResult(null)
+    setError('')
+  }
+
+  const generateAnalysis = async () => {
+    setIsGenerating(true)
+    setError('')
+
+    try {
+      const formData = new FormData()
+      formData.append('patientName', patientName || 'New patient')
+      formData.append('angle', String(angle))
+      if (selectedFile) {
+        formData.append('cephalogram', selectedFile)
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/analyses`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.error ?? 'Analysis request failed')
+      }
+
+      const payload = (await response.json()) as AnalysisResult
+      setAnalysisResult(payload)
+      setAngle(Math.round(Number(payload.angle)))
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to generate analysis')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -650,6 +713,10 @@ function UploadPage() {
                 onClick={() => {
                   setSelectedCase(item)
                   setPreview(null)
+                  setSelectedFile(null)
+                  setAnalysisResult(null)
+                  setError('')
+                  setPatientName(item.patient)
                   setAngle(Math.round(item.angle))
                 }}
                 className={`w-full rounded-lg border p-3 text-left transition ${selectedCase.id === item.id ? 'border-teal-300 bg-white shadow-sm' : 'border-slate-200 bg-white/60'}`}
@@ -668,7 +735,7 @@ function UploadPage() {
           <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center">
             <Upload className="text-teal-600" size={24} />
             <span className="mt-2 text-sm font-black text-slate-950">Upload cephalogram</span>
-            <span className="mt-1 text-xs font-semibold text-slate-500">JPG, PNG, DICOM export</span>
+            <span className="mt-1 text-xs font-semibold text-slate-500">{selectedFile ? selectedFile.name : 'JPG, PNG, DICOM export'}</span>
             <input type="file" className="hidden" accept="image/*" onChange={(event) => handleFile(event.target.files?.[0])} />
           </label>
         </aside>
@@ -695,30 +762,137 @@ function UploadPage() {
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-slate-950">Prediction</h3>
-              <Activity className="text-teal-600" size={20} />
+              {analysisResult ? <CheckCircle2 className="text-teal-600" size={20} /> : <Activity className="text-teal-600" size={20} />}
             </div>
             <div className="mt-5 rounded-lg bg-white p-4">
               <div className="text-sm font-bold uppercase tracking-[0.14em] text-slate-500">Growth Class</div>
-              <div className="mt-2 text-3xl font-black text-slate-950">{predictedClass}</div>
-              <div className="mt-1 text-sm font-semibold text-slate-500">Cephalometric angle: {angle} deg</div>
+              <div className="mt-2 text-3xl font-black text-slate-950">{resultClass}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-500">Cephalometric angle: {resultAngle.toFixed(2)} deg</div>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-teal-500" style={{ width: `${analysisResult?.confidence ?? 70}%` }} />
+              </div>
+              <div className="mt-2 text-xs font-bold text-slate-500">
+                {analysisResult ? `${analysisResult.confidence}% confidence` : 'Generate analysis to get AI confidence'}
+              </div>
             </div>
+            {analysisResult && (
+              <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 p-4 text-sm font-semibold leading-6 text-teal-900">
+                {analysisResult.aiSummary}
+              </div>
+            )}
+            {error && (
+              <div className="mt-4 flex gap-2 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-800">
+                <AlertCircle className="mt-0.5 shrink-0" size={17} /> {error}
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-950">Manual Angle Simulator</h3>
-              <Ruler className="text-teal-600" size={20} />
+              <h3 className="font-black text-slate-950">Generate Analysis</h3>
+              <Wand2 className="text-teal-600" size={20} />
             </div>
+            <label className="mt-5 block">
+              <span className="text-sm font-bold text-slate-700">Patient name</span>
+              <input value={patientName} onChange={(event) => setPatientName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-teal-500" placeholder="Patient name" />
+            </label>
+            <p className="mt-5 text-sm font-bold text-slate-700">Manual angle hint</p>
             <input aria-label="Angle" type="range" min="15" max="50" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-6 w-full accent-teal-600" />
             <div className="mt-4 flex items-center justify-between">
               <span className="text-3xl font-black">{angle} deg</span>
               <span className={`rounded-lg px-3 py-1 text-sm font-black ring-1 ${classStyles[predictedClass]}`}>{predictedClass}</span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Threshold demo: Horizontal at 27 deg or less, Average from 28-37 deg, Vertical at 38 deg and above.</p>
+            <button onClick={generateAnalysis} disabled={isGenerating} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-3 font-black text-white shadow-xl shadow-teal-600/20 disabled:cursor-not-allowed disabled:opacity-70">
+              {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
+              {isGenerating ? 'Analyzing X-ray...' : 'Generate AI Result'}
+            </button>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Upload an X-ray, adjust the angle hint if needed, then generate an AI-supported growth pattern result.</p>
           </div>
         </aside>
       </div>
+      {analysisResult && (
+        <GeneratedVisuals imageSrc={preview ?? selectedCase.image} result={analysisResult} />
+      )}
     </AppShell>
+  )
+}
+
+function GeneratedVisuals({ imageSrc, result }: GeneratedVisualProps) {
+  const angle = Number(result.angle)
+  const className = result.growthClass
+
+  return (
+    <section className="mt-6">
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-teal-700">Generated Visuals</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-950">Related images for review and reporting.</h2>
+        </div>
+        <span className={`w-fit rounded-lg px-3 py-2 text-sm font-black ring-1 ${classStyles[className]}`}>
+          {className} Grower
+        </span>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="relative h-72 bg-slate-950 scanline">
+            <img src={imageSrc} alt="Generated annotated cephalogram" className="h-full w-full object-cover opacity-85 grayscale" />
+            <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
+              <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
+              <path d="M330 370 L405 370" stroke="#ff4f69" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
+              <path d="M330 370 Q354 356 382 367" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
+              <circle cx="330" cy="370" r="7" fill="#ff4f69" />
+              <rect x="28" y="28" width="178" height="58" rx="10" fill="rgba(15,23,42,0.72)" />
+              <text x="46" y="62" fill="#ffffff" fontSize="24" fontWeight="800">{angle.toFixed(2)} deg</text>
+            </svg>
+          </div>
+          <div className="p-4">
+            <h3 className="font-black text-slate-950">Annotated Cephalogram</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Generated overlay showing mandibular plane reference and measured angle marker.</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="relative h-72 overflow-hidden rounded-lg bg-[#17212b] xray-grid">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(45,212,191,0.22),transparent_38%)]" />
+            <div className="absolute left-1/2 top-1/2 h-40 w-52 -translate-x-1/2 -translate-y-1/2 rounded-[48%] border border-cyan-100/35 bg-white/10" />
+            <div className="absolute left-[34%] top-[24%] h-36 w-1 rotate-[-8deg] rounded-full bg-rose-400 shadow-[0_0_18px_rgba(251,113,133,0.75)]" />
+            <div className="absolute left-[38%] top-[64%] h-1 w-44 rotate-[15deg] rounded-full bg-rose-400 shadow-[0_0_18px_rgba(251,113,133,0.75)]" />
+            <div className="absolute bottom-5 left-5 right-5 rounded-lg bg-white/10 p-4 text-white backdrop-blur">
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-200">Growth Pattern</div>
+              <div className="mt-1 text-3xl font-black">{className}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-200">{result.confidence}% confidence</div>
+            </div>
+          </div>
+          <h3 className="mt-4 font-black text-slate-950">Growth Pattern Graphic</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">A generated visual summary that can be shown in review discussions.</p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="h-72 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Report Snapshot</div>
+                <div className="mt-2 text-2xl font-black text-slate-950">{result.patientName}</div>
+              </div>
+              <span className={`rounded-md px-2 py-1 text-xs font-black ring-1 ${classStyles[className]}`}>{className}</span>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-white p-4">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Angle</div>
+                <div className="mt-2 text-3xl font-black text-slate-950">{angle.toFixed(1)}</div>
+              </div>
+              <div className="rounded-lg bg-white p-4">
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Confidence</div>
+                <div className="mt-2 text-3xl font-black text-slate-950">{result.confidence}%</div>
+              </div>
+            </div>
+            <p className="mt-5 line-clamp-4 text-sm font-semibold leading-6 text-slate-600">{result.aiSummary}</p>
+          </div>
+          <h3 className="mt-4 font-black text-slate-950">Clinical Report Card</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">A clean generated snapshot for case discussion and documentation.</p>
+        </div>
+      </div>
+    </section>
   )
 }
 
