@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  color: #17212b;
+  background: #f6f8fb;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(124, 141, 160, 0.22);
+  box-shadow: 0 24px 70px rgba(22, 34, 48, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.xray-grid {
+  background-image:
+    linear-gradient(rgba(63, 148, 175, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 148, 175, 0.1) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+
+.scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanline::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(54, 205, 181, 0.13) 48%,
+    rgba(54, 205, 181, 0.36) 50%,
+    rgba(54, 205, 181, 0.13) 52%,
+    transparent 100%
+  );
+  animation: scan 4.5s linear infinite;
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

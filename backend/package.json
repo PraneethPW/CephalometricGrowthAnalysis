@@ -1,0 +1,36 @@
+{
+  "name": "cephgrow-ai-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CephGrow AI backend API with Prisma, Neon Postgres, and OpenRouter.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "openai": "^6.39.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^24.12.4",
+    "prisma": "^6.19.3",
+    "tsx": "^4.22.3",
+    "typescript": "~6.0.2"
+  }
+}

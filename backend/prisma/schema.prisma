@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Analysis {
+  id          String   @id @default(uuid())
+  patientName String   @map("patient_name")
+  imageName   String   @map("image_name")
+  angle       Decimal  @db.Decimal(5, 2)
+  growthClass String   @map("growth_class")
+  confidence  Int
+  aiSummary   String   @map("ai_summary")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("analyses")
+}
