@@ -35,7 +35,14 @@ const openRouter = process.env.OPENROUTER_API_KEY
 
 const createAnalysisSchema = z.object({
   patientName: z.string().min(1).default('Untitled patient'),
-  angle: z.coerce.number().min(0).max(90).optional(),
+  analysisMode: z.enum(['measurements', 'image-assisted']).default('measurements'),
+  angle: z.coerce.number().min(0).max(90),
+  age: z.coerce.number().min(4).max(30).optional(),
+  sex: z.enum(['female', 'male', 'unspecified']).default('unspecified'),
+  fma: z.coerce.number().min(10).max(60).optional(),
+  yAxis: z.coerce.number().min(45).max(80).optional(),
+  jarabakRatio: z.coerce.number().min(45).max(85).optional(),
+  clinicianNote: z.string().max(1000).optional(),
 })
 
 const aiEstimateSchema = z.object({
@@ -74,10 +81,37 @@ function classifyGrowth(angle: number): GrowthClass {
   return 'Average'
 }
 
-function estimateConfidence(angle: number, growthClass: GrowthClass) {
-  const center = growthClass === 'Horizontal' ? 22 : growthClass === 'Vertical' ? 43 : 33
-  const distance = Math.abs(angle - center)
-  return Math.max(78, Math.min(96, Math.round(96 - distance * 1.8)))
+function measurementVote(value: number, horizontalMax: number, verticalMin: number): GrowthClass {
+  if (value <= horizontalMax) return 'Horizontal'
+  if (value >= verticalMin) return 'Vertical'
+  return 'Average'
+}
+
+function calculateMeasurementEstimate(input: z.infer<typeof createAnalysisSchema>): AnalysisEstimate {
+  const votes: GrowthClass[] = [classifyGrowth(input.angle)]
+  if (input.fma !== undefined) votes.push(measurementVote(input.fma, 21, 28))
+  if (input.yAxis !== undefined) votes.push(measurementVote(input.yAxis, 59, 66))
+  // A higher Jarabak ratio generally supports a more horizontal pattern.
+  if (input.jarabakRatio !== undefined) votes.push(measurementVote(100 - input.jarabakRatio, 35, 40))
+
+  const counts = votes.reduce<Record<GrowthClass, number>>(
+    (result, vote) => ({ ...result, [vote]: result[vote] + 1 }),
+    { Horizontal: 0, Average: 0, Vertical: 0 },
+  )
+  const growthClass = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? classifyGrowth(input.angle)) as GrowthClass
+  const agreement = counts[growthClass] / votes.length
+  const completeness = Math.min(1, votes.length / 4)
+  const confidence = Math.round(55 + agreement * 25 + completeness * 15)
+  const supplied = [input.fma && `FMA ${input.fma}°`, input.yAxis && `Y-axis ${input.yAxis}°`, input.jarabakRatio && `Jarabak ${input.jarabakRatio}%`]
+    .filter(Boolean)
+    .join(', ')
+
+  return {
+    angle: input.angle,
+    growthClass,
+    confidence: Math.min(95, confidence),
+    aiSummary: `Measurement-based result: mandibular-plane angle ${input.angle.toFixed(2)}°${supplied ? `; ${supplied}` : ''}. ${votes.length > 1 && agreement < 1 ? 'The entered measures are not fully concordant, so clinician review is especially important.' : 'The entered measures are concordant with this support classification.'} This is not a diagnosis and must be verified by an orthodontist.`,
+  }
 }
 
 function extractJson(text: string) {
@@ -93,21 +127,9 @@ function extractJson(text: string) {
   return JSON.parse(raw.slice(jsonStart, jsonEnd + 1))
 }
 
-function fallbackEstimate(angle?: number): AnalysisEstimate {
-  const resolvedAngle = angle ?? Number((30 + Math.random() * 10).toFixed(2))
-  const growthClass = classifyGrowth(resolvedAngle)
-
-  return {
-    angle: resolvedAngle,
-    growthClass,
-    confidence: estimateConfidence(resolvedAngle, growthClass),
-    aiSummary: `Angle ${resolvedAngle.toFixed(2)} deg is classified as ${growthClass}. This is a decision-support result and should be verified by an orthodontist.`,
-  }
-}
-
-async function estimateFromImage(file: Express.Multer.File | undefined, manualAngle?: number): Promise<AnalysisEstimate> {
+async function estimateFromImage(file: Express.Multer.File | undefined, input: z.infer<typeof createAnalysisSchema>): Promise<AnalysisEstimate> {
   if (!openRouter || !file) {
-    return fallbackEstimate(manualAngle)
+    return calculateMeasurementEstimate(input)
   }
 
   try {
@@ -125,7 +147,7 @@ async function estimateFromImage(file: Express.Multer.File | undefined, manualAn
           content: [
             {
               type: 'text',
-              text: `Analyze this lateral cephalogram for growth pattern support. If a manual angle is provided, use it as a strong hint but still inspect the image. Manual angle: ${manualAngle ?? 'not provided'} degrees. Return only JSON with keys: angle (number), growthClass ("Vertical" | "Average" | "Horizontal"), confidence (1-100), aiSummary (2 short sentences mentioning clinician verification). Classification thresholds: Horizontal <=27, Average 28-37, Vertical >=38.`,
+              text: `Review this lateral cephalogram as a clinician-support cross-check only. The clinician-entered mandibular-plane angle is ${input.angle} degrees and must remain the reported angle. Other supplied measures: FMA ${input.fma ?? 'not supplied'}, Y-axis ${input.yAxis ?? 'not supplied'}, Jarabak ratio ${input.jarabakRatio ?? 'not supplied'}%. Return only JSON with keys: angle (number), growthClass ("Vertical" | "Average" | "Horizontal"), confidence (1-100), aiSummary (2 short sentences mentioning clinician verification). Classification thresholds: Horizontal <=27, Average 28-37, Vertical >=38.`,
             },
             {
               type: 'image_url',
@@ -150,7 +172,7 @@ async function estimateFromImage(file: Express.Multer.File | undefined, manualAn
       aiSummary: parsed.aiSummary,
     }
   } catch {
-    const fallback = fallbackEstimate(manualAngle)
+    const fallback = calculateMeasurementEstimate(input)
 
     return {
       ...fallback,
@@ -159,29 +181,6 @@ async function estimateFromImage(file: Express.Multer.File | undefined, manualAn
         'The image was uploaded successfully, but AI vision analysis could not complete. A threshold-based support result is shown from the angle hint and should be verified by an orthodontist.',
     }
   }
-}
-
-async function generateSummary(angle: number, growthClass: GrowthClass) {
-  if (!openRouter) {
-    return `Angle ${angle.toFixed(2)} deg is classified as ${growthClass}. This is a decision-support result and should be verified by an orthodontist.`
-  }
-
-  const completion = await openRouter.chat.completions.create({
-    model: process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You write concise orthodontic decision-support summaries. Do not provide a final diagnosis. Mention clinician verification.',
-      },
-      {
-        role: 'user',
-        content: `Cephalometric mandibular plane angle: ${angle.toFixed(2)} degrees. Growth class: ${growthClass}. Write a 2 sentence clinical support note.`,
-      },
-    ],
-  })
-
-  return completion.choices[0]?.message?.content?.trim() || `Classified as ${growthClass}; clinician review required.`
 }
 
 app.use(helmet())
@@ -245,11 +244,15 @@ app.get('/api/analyses', async (_request, response, next) => {
 app.post('/api/analyses', upload.single('cephalogram'), async (request, response, next) => {
   try {
     const body = createAnalysisSchema.parse(request.body ?? {})
-    const estimate = await estimateFromImage(request.file, body.angle)
+    if (body.analysisMode === 'image-assisted' && !request.file) {
+      response.status(400).json({ error: 'Image-assisted mode requires a lateral cephalogram image.' })
+      return
+    }
+    const estimate = body.analysisMode === 'image-assisted' ? await estimateFromImage(request.file, body) : calculateMeasurementEstimate(body)
     const angle = estimate.angle
     const growthClass = estimate.growthClass
     const confidence = estimate.confidence
-    const aiSummary = openRouter && request.file ? estimate.aiSummary : await generateSummary(angle, growthClass)
+    const aiSummary = estimate.aiSummary
     const imageName = request.file?.originalname ?? 'manual-entry'
 
     const payload = {
@@ -280,6 +283,17 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
   } catch (error) {
     next(error)
   }
+})
+
+app.post('/api/training-feedback', express.json(), (request, response) => {
+  const feedback = z.object({
+    analysisId: z.string().min(1),
+    clinicianClass: z.enum(['Vertical', 'Average', 'Horizontal']),
+    note: z.string().max(1000).optional(),
+  }).parse(request.body)
+  // A labelled case is deliberately recorded as feedback rather than silently changing a model.
+  // Production model training must use a de-identified, governed dataset and external validation.
+  response.status(202).json({ accepted: true, feedback, message: 'Feedback accepted for governed model-training review.' })
 })
 
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {

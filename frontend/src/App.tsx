@@ -643,6 +643,13 @@ function DashboardPage() {
 function UploadPage() {
   const [selectedCase, setSelectedCase] = useState(cases[0])
   const [angle, setAngle] = useState(34)
+  const [analysisMode, setAnalysisMode] = useState<'measurements' | 'image-assisted'>('measurements')
+  const [age, setAge] = useState('')
+  const [sex, setSex] = useState<'female' | 'male' | 'unspecified'>('unspecified')
+  const [fma, setFma] = useState('')
+  const [yAxis, setYAxis] = useState('')
+  const [jarabakRatio, setJarabakRatio] = useState('')
+  const [clinicianNote, setClinicianNote] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [patientName, setPatientName] = useState('New patient')
@@ -670,7 +677,14 @@ function UploadPage() {
     try {
       const formData = new FormData()
       formData.append('patientName', patientName || 'New patient')
+      formData.append('analysisMode', analysisMode)
       formData.append('angle', String(angle))
+      if (age) formData.append('age', age)
+      formData.append('sex', sex)
+      if (fma) formData.append('fma', fma)
+      if (yAxis) formData.append('yAxis', yAxis)
+      if (jarabakRatio) formData.append('jarabakRatio', jarabakRatio)
+      if (clinicianNote) formData.append('clinicianNote', clinicianNote)
       if (selectedFile) {
         formData.append('cephalogram', selectedFile)
       }
@@ -745,7 +759,7 @@ function UploadPage() {
             <div className="flex items-center gap-2 text-sm font-bold">
               <FileImage size={17} /> Lateral cephalogram viewer
             </div>
-            <div className="text-xs font-bold text-teal-200">Mandibular plane overlay active</div>
+              <div className="text-xs font-bold text-teal-200">{analysisMode === 'image-assisted' ? 'Image cross-check active' : 'Measurement review mode'}</div>
           </div>
           <div className="relative h-[520px] scanline">
             <img src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
@@ -789,24 +803,37 @@ function UploadPage() {
 
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-950">Generate Analysis</h3>
+              <h3 className="font-black text-slate-950">Analysis inputs</h3>
               <Wand2 className="text-teal-600" size={20} />
             </div>
+            <div className="mt-5 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+              <button type="button" onClick={() => setAnalysisMode('measurements')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'measurements' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Measurements</button>
+              <button type="button" onClick={() => setAnalysisMode('image-assisted')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'image-assisted' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Image assisted</button>
+            </div>
+            <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">Measurements mode is deterministic. Image-assisted mode cross-checks the uploaded image but never replaces entered measurements.</p>
             <label className="mt-5 block">
               <span className="text-sm font-bold text-slate-700">Patient name</span>
               <input value={patientName} onChange={(event) => setPatientName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-teal-500" placeholder="Patient name" />
             </label>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className="block"><span className="text-xs font-bold text-slate-700">Age (years)</span><input inputMode="numeric" value={age} onChange={(event) => setAge(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-700">Sex</span><select value={sex} onChange={(event) => setSex(event.target.value as typeof sex)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"><option value="unspecified">Unspecified</option><option value="female">Female</option><option value="male">Male</option></select></label>
+              <label className="block"><span className="text-xs font-bold text-slate-700">FMA (°)</span><input inputMode="decimal" value={fma} onChange={(event) => setFma(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
+              <label className="block"><span className="text-xs font-bold text-slate-700">Y-axis (°)</span><input inputMode="decimal" value={yAxis} onChange={(event) => setYAxis(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
+            </div>
+            <label className="mt-3 block"><span className="text-xs font-bold text-slate-700">Jarabak ratio (%)</span><input inputMode="decimal" value={jarabakRatio} onChange={(event) => setJarabakRatio(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
             <p className="mt-5 text-sm font-bold text-slate-700">Manual angle hint</p>
             <input aria-label="Angle" type="range" min="15" max="50" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-6 w-full accent-teal-600" />
             <div className="mt-4 flex items-center justify-between">
               <span className="text-3xl font-black">{angle} deg</span>
               <span className={`rounded-lg px-3 py-1 text-sm font-black ring-1 ${classStyles[predictedClass]}`}>{predictedClass}</span>
             </div>
+            <label className="mt-4 block"><span className="text-xs font-bold text-slate-700">Clinician context (optional)</span><textarea value={clinicianNote} onChange={(event) => setClinicianNote(event.target.value)} className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Observations for the report" /></label>
             <button onClick={generateAnalysis} disabled={isGenerating} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-3 font-black text-white shadow-xl shadow-teal-600/20 disabled:cursor-not-allowed disabled:opacity-70">
               {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
-              {isGenerating ? 'Analyzing X-ray...' : 'Generate AI Result'}
+              {isGenerating ? 'Creating support report...' : 'Generate support report'}
             </button>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Upload an X-ray, adjust the angle hint if needed, then generate an AI-supported growth pattern result.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Enter the measured angle and any supporting values. A clinician must verify all results before diagnosis or treatment planning.</p>
           </div>
         </aside>
       </div>
