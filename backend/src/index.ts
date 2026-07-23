@@ -45,11 +45,11 @@ const createAnalysisSchema = z.object({
   clinicianNote: z.string().max(1000).optional(),
 })
 
-const aiEstimateSchema = z.object({
-  angle: z.coerce.number().min(0).max(90),
-  growthClass: z.enum(['Vertical', 'Average', 'Horizontal']),
-  confidence: z.coerce.number().min(1).max(100),
-  aiSummary: z.string().min(12),
+const imageVerificationSchema = z.object({
+  isLateralCephalogram: z.boolean(),
+  confidence: z.coerce.number().min(0).max(100),
+  imageQuality: z.enum(['diagnostic', 'limited', 'unusable']),
+  reason: z.string().min(5).max(500),
 })
 
 const demoAnalyses = [
@@ -127,9 +127,14 @@ function extractJson(text: string) {
   return JSON.parse(raw.slice(jsonStart, jsonEnd + 1))
 }
 
-async function estimateFromImage(file: Express.Multer.File | undefined, input: z.infer<typeof createAnalysisSchema>): Promise<AnalysisEstimate> {
-  if (!openRouter || !file) {
-    return calculateMeasurementEstimate(input)
+class ImageVerificationError extends Error {}
+
+async function verifyCephalogram(file: Express.Multer.File) {
+  if (!file.mimetype.startsWith('image/')) {
+    throw new ImageVerificationError('Only an image export of a lateral cephalogram can be analyzed.')
+  }
+  if (!openRouter) {
+    throw new ImageVerificationError('Image verification is unavailable. Configure OPENROUTER_API_KEY, or remove the attachment and use measurements-only mode.')
   }
 
   try {
@@ -137,49 +142,25 @@ async function estimateFromImage(file: Express.Multer.File | undefined, input: z
     const completion = await openRouter.chat.completions.create({
       model: process.env.OPENROUTER_VISION_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini',
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are an orthodontic decision-support assistant. Estimate cephalometric mandibular plane growth pattern from a lateral cephalogram image. This is not a diagnosis. Return only valid JSON.',
-        },
+        { role: 'system', content: 'You are a strict radiology image-intake gate. Do not diagnose. Return only valid JSON.' },
         {
           role: 'user',
           content: [
-            {
-              type: 'text',
-              text: `Review this lateral cephalogram as a clinician-support cross-check only. The clinician-entered mandibular-plane angle is ${input.angle} degrees and must remain the reported angle. Other supplied measures: FMA ${input.fma ?? 'not supplied'}, Y-axis ${input.yAxis ?? 'not supplied'}, Jarabak ratio ${input.jarabakRatio ?? 'not supplied'}%. Return only JSON with keys: angle (number), growthClass ("Vertical" | "Average" | "Horizontal"), confidence (1-100), aiSummary (2 short sentences mentioning clinician verification). Classification thresholds: Horizontal <=27, Average 28-37, Vertical >=38.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: dataUrl,
-              },
-            },
+            { type: 'text', text: 'Determine whether this is a usable lateral cephalometric radiograph or a correctly exported lateral cephalogram. Reject photographs, screenshots unrelated to radiographs, non-lateral projections, drawings, documents, and low-quality images. Return only JSON: {"isLateralCephalogram":boolean,"confidence":0-100,"imageQuality":"diagnostic"|"limited"|"unusable","reason":"short reason"}.' },
+            { type: 'image_url', image_url: { url: dataUrl } },
           ],
         },
       ],
     } as never)
-
     const text = completion.choices[0]?.message?.content
-    const parsed = aiEstimateSchema.parse(extractJson(typeof text === 'string' ? text : JSON.stringify(text)))
-    const angle = Number(parsed.angle.toFixed(2))
-    const growthClass = parsed.growthClass || classifyGrowth(angle)
-
-    return {
-      angle,
-      growthClass,
-      confidence: Math.round(parsed.confidence),
-      aiSummary: parsed.aiSummary,
+    const verification = imageVerificationSchema.parse(extractJson(typeof text === 'string' ? text : JSON.stringify(text)))
+    if (!verification.isLateralCephalogram || verification.imageQuality !== 'diagnostic' || verification.confidence < 85) {
+      throw new ImageVerificationError(`Upload rejected: ${verification.reason}. Please upload a diagnostic-quality lateral cephalogram.`)
     }
-  } catch {
-    const fallback = calculateMeasurementEstimate(input)
-
-    return {
-      ...fallback,
-      confidence: Math.min(fallback.confidence, 82),
-      aiSummary:
-        'The image was uploaded successfully, but AI vision analysis could not complete. A threshold-based support result is shown from the angle hint and should be verified by an orthodontist.',
-    }
+    return verification
+  } catch (error) {
+    if (error instanceof ImageVerificationError) throw error
+    throw new ImageVerificationError('The uploaded image could not be verified as a diagnostic lateral cephalogram. No analysis was generated.')
   }
 }
 
@@ -248,11 +229,14 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
       response.status(400).json({ error: 'Image-assisted mode requires a lateral cephalogram image.' })
       return
     }
-    const estimate = body.analysisMode === 'image-assisted' ? await estimateFromImage(request.file, body) : calculateMeasurementEstimate(body)
+    const imageVerification = request.file ? await verifyCephalogram(request.file) : null
+    const estimate = calculateMeasurementEstimate(body)
     const angle = estimate.angle
     const growthClass = estimate.growthClass
     const confidence = estimate.confidence
-    const aiSummary = estimate.aiSummary
+    const aiSummary = imageVerification
+      ? `${estimate.aiSummary} Image intake passed (${imageVerification.confidence}% verification confidence): ${imageVerification.reason}`
+      : estimate.aiSummary
     const imageName = request.file?.originalname ?? 'manual-entry'
 
     const payload = {

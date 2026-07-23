@@ -675,6 +675,9 @@ function UploadPage() {
     setError('')
 
     try {
+      if (analysisMode === 'image-assisted' && !selectedFile) {
+        throw new Error('Image-assisted mode requires a diagnostic-quality lateral cephalogram upload.')
+      }
       const formData = new FormData()
       formData.append('patientName', patientName || 'New patient')
       formData.append('analysisMode', analysisMode)
@@ -810,7 +813,7 @@ function UploadPage() {
               <button type="button" onClick={() => setAnalysisMode('measurements')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'measurements' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Measurements</button>
               <button type="button" onClick={() => setAnalysisMode('image-assisted')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'image-assisted' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Image assisted</button>
             </div>
-            <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">Measurements mode is deterministic. Image-assisted mode cross-checks the uploaded image but never replaces entered measurements.</p>
+            <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">Measurements mode creates a report only from clinician-entered values. Image-assisted mode first rejects non-cephalogram, non-lateral, or low-quality images; it never replaces entered measurements.</p>
             <label className="mt-5 block">
               <span className="text-sm font-bold text-slate-700">Patient name</span>
               <input value={patientName} onChange={(event) => setPatientName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-teal-500" placeholder="Patient name" />
@@ -833,7 +836,7 @@ function UploadPage() {
               {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
               {isGenerating ? 'Creating support report...' : 'Generate support report'}
             </button>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Enter the measured angle and any supporting values. A clinician must verify all results before diagnosis or treatment planning.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">A report is generated only from entered measurements. Any attachment must pass a diagnostic lateral-cephalogram check; rejected images produce no result.</p>
           </div>
         </aside>
       </div>
