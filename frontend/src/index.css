@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
+@theme {
+  --color-teal-50: #eff6ff;
+  --color-teal-100: #dbeafe;
+  --color-teal-200: #bfdbfe;
+  --color-teal-300: #93c5fd;
+  --color-teal-400: #60a5fa;
+  --color-teal-500: #2563eb;
+  --color-teal-600: #1d4ed8;
+  --color-teal-700: #1e40af;
+  --color-teal-900: #172554;
+  --color-rose-50: #fff7ed;
+  --color-rose-100: #ffedd5;
+  --color-rose-200: #fed7aa;
+  --color-rose-400: #fb923c;
+  --color-rose-700: #c2410c;
+  --color-rose-800: #9a3412;
+  --color-amber-50: #fff7ed;
+  --color-amber-200: #fed7aa;
+  --color-amber-700: #c2410c;
+}
+
 :root {
-  color: #17212b;
-  background: #f6f8fb;
+  color: #102a63;
+  background: #f4f8ff;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -42,16 +63,16 @@ button {
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(124, 141, 160, 0.22);
-  box-shadow: 0 24px 70px rgba(22, 34, 48, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  box-shadow: 0 24px 70px rgba(30, 64, 175, 0.12);
   backdrop-filter: blur(18px);
 }
 
 .xray-grid {
   background-image:
-    linear-gradient(rgba(63, 148, 175, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(63, 148, 175, 0.1) 1px, transparent 1px);
+    linear-gradient(rgba(37, 99, 235, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249, 115, 22, 0.08) 1px, transparent 1px);
   background-size: 26px 26px;
 }
 

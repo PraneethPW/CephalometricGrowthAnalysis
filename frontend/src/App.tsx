@@ -257,7 +257,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
 function CranioFallback() {
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_55%_35%,rgba(103,232,249,0.28),transparent_34%),linear-gradient(135deg,#10222b,#17212b)]">
+    <div className="relative h-full w-full overflow-hidden rounded-xl bg-[radial-gradient(circle_at_55%_35%,rgba(96,165,250,0.35),transparent_34%),linear-gradient(135deg,#0f2f78,#1d4ed8)]">
       <div className="absolute left-1/2 top-1/2 h-28 w-40 -translate-x-1/2 -translate-y-1/2 rotate-[-10deg] rounded-[55%_45%_45%_55%] border border-cyan-100/50 bg-cyan-50/20 shadow-[0_0_45px_rgba(103,232,249,0.24)]" />
       <div className="absolute left-[58%] top-[49%] h-16 w-24 -translate-x-1/2 -translate-y-1/2 rotate-[-8deg] rounded-[45%] border border-cyan-100/40 bg-white/10" />
       <div className="absolute left-[60%] top-[63%] h-4 w-28 rotate-[13deg] rounded-full bg-white/25" />
@@ -319,7 +319,7 @@ function CranioScene() {
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-3">
-      <span className="grid h-10 w-10 place-items-center rounded-lg bg-[#17212b] text-white">
+      <span className="grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-blue-700 to-orange-500 text-white shadow-lg shadow-blue-500/30">
         <Ruler size={20} />
       </span>
       <span>
@@ -596,12 +596,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
   ]
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] text-[#17212b]">
-      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-72 border-r border-slate-200 bg-white p-5 lg:block">
+    <main className="min-h-screen bg-[#f4f8ff] text-[#102a63]">
+      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-72 border-r border-blue-100 bg-white p-5 lg:block">
         <Brand />
         <nav className="mt-8 space-y-2">
           {navItems.map(({ to, label, Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-black ${isActive ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <NavLink key={to} to={to} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-black ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : 'text-slate-600 hover:bg-orange-50 hover:text-orange-700'}`}>
               <Icon size={18} /> {label}
             </NavLink>
           ))}
@@ -615,7 +615,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-5 py-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/90 px-5 py-4 backdrop-blur lg:px-8">
           <div className="flex items-center justify-between">
             <div className="lg:hidden">
               <Brand />
@@ -757,12 +757,15 @@ function UploadPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <p className="text-sm font-black uppercase tracking-[0.18em] text-teal-700">Protected Upload</p>
-        <h2 className="mt-2 text-4xl font-black text-slate-950">Upload and analyze cephalograms.</h2>
+      <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-orange-600">Clinical workspace</p>
+          <h2 className="mt-1 text-4xl font-black text-slate-950">Upload. Measure. Review.</h2>
+        </div>
+        <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 ring-1 ring-blue-200">User-input growth support</div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr_340px]">
-        <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="grid overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl shadow-blue-900/10 xl:grid-cols-[230px_minmax(0,1fr)_370px]">
+        <aside className="border-b border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4 xl:border-b-0 xl:border-r">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             <PanelLeft size={18} /> Demo Cases
           </div>
@@ -779,7 +782,7 @@ function UploadPage() {
                   setPatientName(item.patient)
                   setAngle(Math.round(item.angle))
                 }}
-                className={`w-full rounded-lg border p-3 text-left transition ${selectedCase.id === item.id ? 'border-teal-300 bg-white shadow-sm' : 'border-slate-200 bg-white/60'}`}
+                className={`w-full rounded-lg border p-3 text-left transition ${selectedCase.id === item.id ? 'border-orange-300 bg-white shadow-md shadow-orange-200/40' : 'border-blue-100 bg-white/70 hover:border-blue-300'}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-black">{item.patient}</span>
@@ -792,22 +795,22 @@ function UploadPage() {
               </button>
             ))}
           </div>
-          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center">
-            <Upload className="text-teal-600" size={24} />
+          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-blue-300 bg-white px-4 py-5 text-center transition hover:border-orange-400 hover:bg-orange-50">
+            <Upload className="text-orange-500" size={24} />
             <span className="mt-2 text-sm font-black text-slate-950">Upload cephalogram</span>
             <span className="mt-1 text-xs font-semibold text-slate-500">{selectedFile ? selectedFile.name : 'JPG, PNG, DICOM export'}</span>
             <input type="file" className="hidden" accept="image/*" onChange={(event) => handleFile(event.target.files?.[0])} />
           </label>
         </aside>
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-white">
+        <div className="min-w-0 overflow-hidden bg-slate-100">
+          <div className="flex items-center justify-between bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 px-4 py-3 text-white">
             <div className="flex items-center gap-2 text-sm font-bold">
               <FileImage size={17} /> Lateral cephalogram viewer
             </div>
-              <div className="text-xs font-bold text-teal-200">{analysisMode === 'image-assisted' ? 'Image cross-check active' : 'Measurement review mode'}</div>
+              <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-orange-100">{analysisMode === 'image-assisted' ? 'Image cross-check active' : 'Measurement review mode'}</div>
           </div>
-          <div className="relative h-[520px] scanline">
+          <div className="relative h-[540px] scanline">
             <CephalogramImage src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
               <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
@@ -818,25 +821,25 @@ function UploadPage() {
           </div>
         </div>
 
-        <aside className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+        <aside className="border-t border-blue-100 bg-white xl:border-l xl:border-t-0">
+          <div className={`border-b border-blue-100 p-5 ${analysisResult ? 'bg-gradient-to-br from-orange-50 via-white to-blue-50' : 'bg-slate-50'}`}>
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-950">Prediction</h3>
+              <h3 className="font-black text-slate-950">Live result</h3>
               {analysisResult ? <CheckCircle2 className="text-teal-600" size={20} /> : <Activity className="text-teal-600" size={20} />}
             </div>
-            <div className="mt-5 rounded-lg bg-white p-4">
-              <div className="text-sm font-bold uppercase tracking-[0.14em] text-slate-500">Growth Class</div>
-              <div className="mt-2 text-3xl font-black text-slate-950">{resultClass}</div>
+            <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4 shadow-lg shadow-blue-900/5">
+              <div className="text-sm font-bold uppercase tracking-[0.14em] text-blue-600">Growth Class</div>
+              <div className="mt-1 text-4xl font-black text-slate-950">{resultClass}</div>
               <div className="mt-1 text-sm font-semibold text-slate-500">Cephalometric angle: {resultAngle.toFixed(2)} deg</div>
               <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
-                <div className="h-full rounded-full bg-teal-500" style={{ width: `${analysisResult?.confidence ?? 70}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-orange-500" style={{ width: `${analysisResult?.confidence ?? 70}%` }} />
               </div>
               <div className="mt-2 text-xs font-bold text-slate-500">
                 {analysisResult ? `${analysisResult.confidence}% confidence` : 'Generate analysis to get AI confidence'}
               </div>
             </div>
             {analysisResult && (
-              <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 p-4 text-sm font-semibold leading-6 text-teal-900">
+              <div className="mt-4 rounded-xl border border-orange-200 bg-white p-4 text-sm font-semibold leading-6 text-blue-950 shadow-md shadow-orange-200/30">
                 {analysisResult.aiSummary}
               </div>
             )}
@@ -847,19 +850,19 @@ function UploadPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="p-5">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-slate-950">Analysis inputs</h3>
-              <Wand2 className="text-teal-600" size={20} />
+              <Wand2 className="text-orange-500" size={20} />
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-              <button type="button" onClick={() => setAnalysisMode('measurements')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'measurements' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Measurements</button>
-              <button type="button" onClick={() => setAnalysisMode('image-assisted')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'image-assisted' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600'}`}>Image assisted</button>
+              <button type="button" onClick={() => setAnalysisMode('measurements')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'measurements' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600'}`}>Measurements</button>
+              <button type="button" onClick={() => setAnalysisMode('image-assisted')} className={`rounded-md px-3 py-2 text-xs font-black ${analysisMode === 'image-assisted' ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-600'}`}>Image assisted</button>
             </div>
             <p className="mt-3 text-xs font-semibold leading-5 text-slate-500">Measurements mode creates a report only from clinician-entered values. Image-assisted mode first rejects non-cephalogram, non-lateral, or low-quality images; it never replaces entered measurements.</p>
             <label className="mt-5 block">
               <span className="text-sm font-bold text-slate-700">Patient name</span>
-              <input value={patientName} onChange={(event) => setPatientName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-teal-500" placeholder="Patient name" />
+              <input value={patientName} onChange={(event) => setPatientName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Patient name" />
             </label>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <label className="block"><span className="text-xs font-bold text-slate-700">Age (years)</span><input inputMode="numeric" value={age} onChange={(event) => setAge(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
@@ -869,13 +872,13 @@ function UploadPage() {
             </div>
             <label className="mt-3 block"><span className="text-xs font-bold text-slate-700">Jarabak ratio (%)</span><input inputMode="decimal" value={jarabakRatio} onChange={(event) => setJarabakRatio(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Optional" /></label>
             <p className="mt-5 text-sm font-bold text-slate-700">Manual angle hint</p>
-            <input aria-label="Angle" type="range" min="15" max="50" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-6 w-full accent-teal-600" />
+            <input aria-label="Angle" type="range" min="15" max="50" value={angle} onChange={(event) => setAngle(Number(event.target.value))} className="mt-6 w-full accent-orange-500" />
             <div className="mt-4 flex items-center justify-between">
               <span className="text-3xl font-black">{angle} deg</span>
               <span className={`rounded-lg px-3 py-1 text-sm font-black ring-1 ${classStyles[predictedClass]}`}>{predictedClass}</span>
             </div>
             <label className="mt-4 block"><span className="text-xs font-bold text-slate-700">Clinician context (optional)</span><textarea value={clinicianNote} onChange={(event) => setClinicianNote(event.target.value)} className="mt-1 min-h-16 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500" placeholder="Observations for the report" /></label>
-            <button onClick={generateAnalysis} disabled={isGenerating} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-3 font-black text-white shadow-xl shadow-teal-600/20 disabled:cursor-not-allowed disabled:opacity-70">
+            <button onClick={generateAnalysis} disabled={isGenerating} className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-3 font-black text-white shadow-xl shadow-orange-500/25 transition hover:from-orange-600 hover:to-blue-600 disabled:cursor-not-allowed disabled:opacity-70">
               {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
               {isGenerating ? 'Creating support report...' : 'Generate support report'}
             </button>
