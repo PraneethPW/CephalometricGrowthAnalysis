@@ -764,7 +764,7 @@ function UploadPage() {
         </div>
         <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 ring-1 ring-blue-200">User-input growth support</div>
       </div>
-      <div className="grid overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl shadow-blue-900/10 xl:grid-cols-[230px_minmax(0,1fr)_370px]">
+      <div className="grid items-start overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl shadow-blue-900/10 xl:grid-cols-[230px_minmax(0,1fr)_370px]">
         <aside className="border-b border-blue-100 bg-gradient-to-b from-blue-50 to-white p-4 xl:border-b-0 xl:border-r">
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
             <PanelLeft size={18} /> Demo Cases
@@ -803,7 +803,7 @@ function UploadPage() {
           </label>
         </aside>
 
-        <div className="min-w-0 overflow-hidden bg-slate-100">
+        <div className="min-w-0 self-start overflow-hidden bg-slate-100">
           <div className="flex items-center justify-between bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 px-4 py-3 text-white">
             <div className="flex items-center gap-2 text-sm font-bold">
               <FileImage size={17} /> Lateral cephalogram viewer
