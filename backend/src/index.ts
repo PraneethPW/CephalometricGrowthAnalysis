@@ -229,14 +229,18 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
       response.status(400).json({ error: 'Image-assisted mode requires a lateral cephalogram image.' })
       return
     }
-    const imageVerification = request.file ? await verifyCephalogram(request.file) : null
+    // Measurements mode is intentionally usable offline: an attachment is retained as context,
+    // but it is never treated as model input unless image-assisted mode was explicitly selected.
+    const imageVerification = body.analysisMode === 'image-assisted' && request.file ? await verifyCephalogram(request.file) : null
     const estimate = calculateMeasurementEstimate(body)
     const angle = estimate.angle
     const growthClass = estimate.growthClass
     const confidence = estimate.confidence
     const aiSummary = imageVerification
       ? `${estimate.aiSummary} Image intake passed (${imageVerification.confidence}% verification confidence): ${imageVerification.reason}`
-      : estimate.aiSummary
+      : request.file
+        ? `${estimate.aiSummary} The attached image was not used for classification because Measurements mode was selected.`
+        : estimate.aiSummary
     const imageName = request.file?.originalname ?? 'manual-entry'
 
     const payload = {

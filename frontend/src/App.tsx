@@ -67,6 +67,31 @@ type AnalysisResult = {
   createdAt: string
 }
 
+const analysisHistoryKey = 'cephgrow-analysis-history'
+
+function getUserCases(): CaseRecord[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(analysisHistoryKey) ?? '[]') as CaseRecord[]
+    return Array.isArray(stored) ? stored : []
+  } catch {
+    return []
+  }
+}
+
+function saveUserCase(result: AnalysisResult, image?: string | null) {
+  const record: CaseRecord = {
+    id: result.id,
+    patient: result.patientName,
+    image: image || '/ceph-average.jpeg',
+    angle: Number(result.angle),
+    className: result.growthClass,
+    confidence: result.confidence,
+    date: new Date(result.createdAt).toLocaleDateString(),
+  }
+  const next = [record, ...getUserCases().filter((item) => item.id !== record.id)].slice(0, 25)
+  localStorage.setItem(analysisHistoryKey, JSON.stringify(next))
+}
+
 type GeneratedVisualProps = {
   imageSrc: string
   result: AnalysisResult
@@ -181,6 +206,22 @@ function useAuth() {
   }
 
   return context
+}
+
+function CephalogramImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => setFailed(false), [src])
+
+  if (failed) {
+    return (
+      <div className="grid h-full w-full place-items-center bg-slate-100 p-6 text-center text-slate-500">
+        <div><FileImage className="mx-auto text-slate-400" size={28} /><p className="mt-2 text-sm font-bold">Preview unavailable</p><p className="mt-1 text-xs">The report was saved; choose another image to refresh the preview.</p></div>
+      </div>
+    )
+  }
+
+  return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
 }
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -374,7 +415,7 @@ function LandingPage() {
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.1 }} className="relative min-h-[520px]">
             <div className="absolute inset-x-0 top-0 h-[410px] rounded-[32px] bg-[#17212b]" />
             <div className="absolute inset-x-4 top-6 h-[410px] overflow-hidden rounded-2xl border border-white/10 bg-slate-950 scanline">
-              <img src={cases[0].image} alt="Cephalogram scan preview" className="h-full w-full object-cover opacity-80" />
+              <CephalogramImage src={cases[0].image} alt="Cephalogram scan preview" className="h-full w-full object-cover opacity-80" />
               <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 480" preserveAspectRatio="none">
                 <path d="M332 245 L342 372 L555 425" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
                 <path d="M342 372 Q365 356 394 368" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
@@ -602,6 +643,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function DashboardPage() {
+  const recentCases = [...getUserCases(), ...cases].slice(0, 5)
   const totals = [
     ['Total cases', '128'],
     ['Average grower', '54'],
@@ -623,7 +665,7 @@ function DashboardPage() {
         <div className="rounded-lg border border-slate-200 bg-white p-5">
           <h2 className="text-2xl font-black text-slate-950">Recent serial cases</h2>
           <div className="mt-5 grid gap-3">
-            {cases.map((item) => (
+            {recentCases.map((item) => (
               <CaseRow key={item.id} item={item} />
             ))}
           </div>
@@ -704,6 +746,7 @@ function UploadPage() {
 
       const payload = (await response.json()) as AnalysisResult
       setAnalysisResult(payload)
+      saveUserCase(payload, preview)
       setAngle(Math.round(Number(payload.angle)))
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to generate analysis')
@@ -757,7 +800,7 @@ function UploadPage() {
           </label>
         </aside>
 
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-white">
             <div className="flex items-center gap-2 text-sm font-bold">
               <FileImage size={17} /> Lateral cephalogram viewer
@@ -765,7 +808,7 @@ function UploadPage() {
               <div className="text-xs font-bold text-teal-200">{analysisMode === 'image-assisted' ? 'Image cross-check active' : 'Measurement review mode'}</div>
           </div>
           <div className="relative h-[520px] scanline">
-            <img src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
+            <CephalogramImage src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
               <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
               <path d="M330 370 L405 370" stroke="#ff4f69" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
@@ -865,7 +908,7 @@ function GeneratedVisuals({ imageSrc, result }: GeneratedVisualProps) {
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="relative h-72 bg-slate-950 scanline">
-            <img src={imageSrc} alt="Generated annotated cephalogram" className="h-full w-full object-cover opacity-85 grayscale" />
+            <CephalogramImage src={imageSrc} alt="Generated annotated cephalogram" className="h-full w-full object-cover opacity-85 grayscale" />
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
               <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
               <path d="M330 370 L405 370" stroke="#ff4f69" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
@@ -927,6 +970,7 @@ function GeneratedVisuals({ imageSrc, result }: GeneratedVisualProps) {
 }
 
 function CasesPage() {
+  const allCases = [...getUserCases(), ...cases]
   return (
     <AppShell>
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -939,7 +983,7 @@ function CasesPage() {
         </Link>
       </div>
       <div className="grid gap-4">
-        {cases.map((item) => (
+        {allCases.map((item) => (
           <CaseRow key={item.id} item={item} />
         ))}
       </div>
@@ -948,6 +992,7 @@ function CasesPage() {
 }
 
 function ReportsPage() {
+  const allCases = [...getUserCases(), ...cases]
   return (
     <AppShell>
       <div className="mb-6">
@@ -955,9 +1000,9 @@ function ReportsPage() {
         <h2 className="mt-2 text-4xl font-black text-slate-950">Growth pattern summary.</h2>
       </div>
       <div className="grid gap-5 lg:grid-cols-3">
-        {cases.map((item) => (
+        {allCases.map((item) => (
           <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-5">
-            <img src={item.image} alt={item.patient} className="h-44 w-full rounded-lg object-cover grayscale" />
+            <div className="h-44 overflow-hidden rounded-lg"><CephalogramImage src={item.image} alt={item.patient} className="h-full w-full object-cover grayscale" /></div>
             <div className="mt-4 flex items-center justify-between">
               <div>
                 <h3 className="font-black text-slate-950">{item.patient}</h3>
@@ -979,7 +1024,7 @@ function CaseRow({ item }: { item: CaseRecord }) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-4">
-        <img src={item.image} alt={item.patient} className="h-20 w-24 rounded-lg object-cover grayscale" />
+        <div className="h-20 w-24 overflow-hidden rounded-lg"><CephalogramImage src={item.image} alt={item.patient} className="h-full w-full object-cover grayscale" /></div>
         <div>
           <div className="font-black text-slate-950">{item.patient}</div>
           <div className="text-sm font-semibold text-slate-500">{item.id} - {item.date}</div>
