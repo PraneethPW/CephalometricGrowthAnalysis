@@ -95,6 +95,11 @@ function saveUserCase(result: AnalysisResult, image?: string | null) {
 type GeneratedVisualProps = {
   imageSrc: string
   result: AnalysisResult
+  measurements: {
+    fma?: number
+    yAxis?: number
+    jarabakRatio?: number
+  }
 }
 
 type AuthContextValue = {
@@ -887,22 +892,86 @@ function UploadPage() {
         </aside>
       </div>
       {analysisResult && (
-        <GeneratedVisuals imageSrc={preview ?? selectedCase.image} result={analysisResult} />
+        <GeneratedVisuals
+          imageSrc={preview ?? selectedCase.image}
+          result={analysisResult}
+          measurements={{
+            fma: fma ? Number(fma) : undefined,
+            yAxis: yAxis ? Number(yAxis) : undefined,
+            jarabakRatio: jarabakRatio ? Number(jarabakRatio) : undefined,
+          }}
+        />
       )}
     </AppShell>
   )
 }
 
-function GeneratedVisuals({ imageSrc, result }: GeneratedVisualProps) {
+function measureGrowthClass(value: number, horizontalMax: number, verticalMin: number) {
+  if (value <= horizontalMax) return 'Horizontal' as GrowthClass
+  if (value >= verticalMin) return 'Vertical' as GrowthClass
+  return 'Average' as GrowthClass
+}
+
+function MeasurementProfile({ angle, measurements }: { angle: number; measurements: GeneratedVisualProps['measurements'] }) {
+  const metrics = [
+    { label: 'Mandibular plane', value: angle, unit: '°', min: 15, max: 50, horizontal: 27, vertical: 38, className: classify(angle) },
+    ...(measurements.fma === undefined ? [] : [{ label: 'FMA', value: measurements.fma, unit: '°', min: 10, max: 60, horizontal: 21, vertical: 28, className: measureGrowthClass(measurements.fma, 21, 28) }]),
+    ...(measurements.yAxis === undefined ? [] : [{ label: 'Y-axis', value: measurements.yAxis, unit: '°', min: 45, max: 80, horizontal: 59, vertical: 66, className: measureGrowthClass(measurements.yAxis, 59, 66) }]),
+    ...(measurements.jarabakRatio === undefined ? [] : [{ label: 'Jarabak ratio', value: measurements.jarabakRatio, unit: '%', min: 45, max: 85, horizontal: 65, vertical: 60, className: measureGrowthClass(100 - measurements.jarabakRatio, 35, 40) }]),
+  ]
+  const chartHeight = 68 + metrics.length * 58
+  const x = (value: number, metric: (typeof metrics)[number]) => 146 + ((value - metric.min) / (metric.max - metric.min)) * 350
+
+  return (
+    <svg viewBox={`0 0 560 ${chartHeight}`} role="img" aria-label="Entered cephalometric measurements compared with growth-pattern reference bands" className="w-full">
+      <title>Measurement profile</title>
+      <desc>Each dot represents an entered value. Blue is the horizontal reference side, neutral is average, and orange is the vertical reference side.</desc>
+      {metrics.map((metric, index) => {
+        const y = 44 + index * 58
+        const first = Math.min(metric.horizontal, metric.vertical)
+        const second = Math.max(metric.horizontal, metric.vertical)
+        return (
+          <g key={metric.label}>
+            <text x="8" y={y - 8} fill="#102a63" fontSize="13" fontWeight="700">{metric.label}</text>
+            <text x="8" y={y + 12} fill="#64748b" fontSize="11">{metric.value.toFixed(1)}{metric.unit} · {metric.className}</text>
+            <rect x="146" y={y - 16} width="350" height="16" rx="8" fill="#dbeafe" />
+            <rect x={x(first, metric)} y={y - 16} width={x(second, metric) - x(first, metric)} height="16" fill="#e2e8f0" />
+            <rect x={x(second, metric)} y={y - 16} width={496 - x(second, metric)} height="16" rx="8" fill="#ffedd5" />
+            <line x1={x(first, metric)} y1={y - 22} x2={x(first, metric)} y2={y + 6} stroke="#64748b" strokeWidth="1" />
+            <line x1={x(second, metric)} y1={y - 22} x2={x(second, metric)} y2={y + 6} stroke="#64748b" strokeWidth="1" />
+            <circle cx={x(Math.max(metric.min, Math.min(metric.value, metric.max)), metric)} cy={y - 8} r="7" fill="#1d4ed8" stroke="white" strokeWidth="3" />
+          </g>
+        )
+      })}
+      <text x="146" y={chartHeight - 12} fill="#64748b" fontSize="11">Horizontal reference</text>
+      <text x="360" y={chartHeight - 12} fill="#64748b" fontSize="11">Average</text>
+      <text x="447" y={chartHeight - 12} fill="#64748b" fontSize="11">Vertical</text>
+    </svg>
+  )
+}
+
+function GeneratedVisuals({ imageSrc, result, measurements }: GeneratedVisualProps) {
   const angle = Number(result.angle)
   const className = result.growthClass
+  const evidence = [
+    { label: 'Mandibular plane', value: `${angle.toFixed(1)}°`, result: classify(angle) },
+    ...(measurements.fma === undefined ? [] : [{ label: 'FMA', value: `${measurements.fma.toFixed(1)}°`, result: measureGrowthClass(measurements.fma, 21, 28) }]),
+    ...(measurements.yAxis === undefined ? [] : [{ label: 'Y-axis', value: `${measurements.yAxis.toFixed(1)}°`, result: measureGrowthClass(measurements.yAxis, 59, 66) }]),
+    ...(measurements.jarabakRatio === undefined ? [] : [{ label: 'Jarabak ratio', value: `${measurements.jarabakRatio.toFixed(1)}%`, result: measureGrowthClass(100 - measurements.jarabakRatio, 35, 40) }]),
+  ]
+  const aligned = evidence.filter((item) => item.result === className).length
+  const reviewPrompts: Record<GrowthClass, string[]> = {
+    Horizontal: ['Compare with serial lower-face-height measurements.', 'Confirm mandibular-plane landmarks before final interpretation.', 'Review dental compensation separately from skeletal pattern.'],
+    Average: ['Compare with serial growth records if available.', 'Confirm mandibular-plane landmarks before final interpretation.', 'Review dental compensation separately from skeletal pattern.'],
+    Vertical: ['Compare with serial lower-face-height measurements.', 'Confirm mandibular-plane landmarks before final interpretation.', 'Review dental compensation separately from skeletal pattern.'],
+  }
 
   return (
     <section className="mt-6">
       <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-teal-700">Generated Visuals</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-950">Related images for review and reporting.</h2>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-orange-600">Generated support report</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-950">Results, input trace, and review prompts.</h2>
         </div>
         <span className={`w-fit rounded-lg px-3 py-2 text-sm font-black ring-1 ${classStyles[className]}`}>
           {className} Grower
@@ -966,6 +1035,38 @@ function GeneratedVisuals({ imageSrc, result }: GeneratedVisualProps) {
           </div>
           <h3 className="mt-4 font-black text-slate-950">Clinical Report Card</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">A clean generated snapshot for case discussion and documentation.</p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
+        <div className="rounded-xl border border-blue-100 bg-white p-5 shadow-lg shadow-blue-900/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Input profile chart</p>
+              <h3 className="mt-1 text-xl font-black text-slate-950">Entered measures against reference bands</h3>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{evidence.length} entered measures</span>
+          </div>
+          <div className="mt-4"><MeasurementProfile angle={angle} measurements={measurements} /></div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">Band positions are a visual aid for the supplied values; they are not an image-derived diagnosis.</p>
+        </div>
+        <div className="rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-blue-50 p-5 shadow-lg shadow-orange-100/50">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-600">AI-supported review</p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">Evidence alignment: {aligned}/{evidence.length}</h3>
+          <div className="mt-4 space-y-2">
+            {evidence.map((item) => (
+              <div key={item.label} className="flex items-center justify-between rounded-lg bg-white/80 px-3 py-2 text-sm">
+                <span className="font-bold text-slate-700">{item.label} <span className="font-normal text-slate-500">{item.value}</span></span>
+                <span className={`rounded-md px-2 py-1 text-xs font-black ring-1 ${classStyles[item.result]}`}>{item.result}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 border-t border-orange-200 pt-4">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">Clinician review prompts</p>
+            <ul className="mt-2 space-y-2 text-sm font-medium leading-5 text-slate-700">
+              {reviewPrompts[className].map((prompt) => <li key={prompt} className="flex gap-2"><span className="text-orange-500">•</span>{prompt}</li>)}
+            </ul>
+          </div>
+          <button type="button" onClick={() => window.print()} className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/25">Print support report</button>
         </div>
       </div>
     </section>
