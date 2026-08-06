@@ -18,6 +18,13 @@ type AnalysisEstimate = {
   aiSummary: string
 }
 
+type CephalometricLandmark = {
+  id: 'S' | 'N' | 'Go' | 'Me'
+  name: string
+  x: number
+  y: number
+}
+
 const app = express()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } })
 const port = Number(process.env.PORT ?? 8787)
@@ -51,6 +58,18 @@ const imageVerificationSchema = z.object({
   imageQuality: z.enum(['diagnostic', 'limited', 'unusable']),
   reason: z.string().min(5).max(500),
 })
+
+const landmarksSchema = z
+  .array(
+    z.object({
+      id: z.enum(['S', 'N', 'Go', 'Me']),
+      name: z.string().min(2).max(20),
+      x: z.coerce.number().min(0).max(700),
+      y: z.coerce.number().min(0).max(520),
+    }),
+  )
+  .length(4)
+  .refine((landmarks) => new Set(landmarks.map((landmark) => landmark.id)).size === 4, 'Each landmark must be unique')
 
 const demoAnalyses = [
   {
@@ -164,6 +183,36 @@ async function verifyCephalogram(file: Express.Multer.File) {
   }
 }
 
+async function locateLandmarks(file: Express.Multer.File): Promise<CephalometricLandmark[]> {
+  if (!openRouter) {
+    throw new ImageVerificationError('Landmark mapping is unavailable. Configure OPENROUTER_API_KEY to use image-assisted analysis.')
+  }
+
+  try {
+    const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
+    const completion = await openRouter.chat.completions.create({
+      model: process.env.OPENROUTER_VISION_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are a cephalometric landmark-assistance system. Do not diagnose. Return only valid JSON.' },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'For this verified lateral cephalogram, locate exactly four visual reference landmarks: S (Sella), N (Nasion), Go (Gonion), and Me (Menton). Return only a JSON array of objects with id, name, x, and y. Coordinates must be relative to a 700-wide by 520-high image: x runs left to right, y runs top to bottom. Use your best visual estimate; this is a review aid, not a diagnosis.' },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        },
+      ],
+    } as never)
+    const text = completion.choices[0]?.message?.content
+    const raw = typeof text === 'string' ? text : JSON.stringify(text)
+    const array = raw.match(/\[[\s\S]*\]/)?.[0]
+    if (!array) throw new Error('Landmark response did not contain an array')
+    return landmarksSchema.parse(JSON.parse(array))
+  } catch {
+    throw new ImageVerificationError('Landmark mapping could not be completed for this image. Please try another diagnostic-quality lateral cephalogram.')
+  }
+}
+
 app.use(helmet())
 const allowedOrigins = [
   'http://localhost:5173',
@@ -232,6 +281,7 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
     // Measurements mode is intentionally usable offline: an attachment is retained as context,
     // but it is never treated as model input unless image-assisted mode was explicitly selected.
     const imageVerification = body.analysisMode === 'image-assisted' && request.file ? await verifyCephalogram(request.file) : null
+    const landmarks = imageVerification && request.file ? await locateLandmarks(request.file) : undefined
     const estimate = calculateMeasurementEstimate(body)
     const angle = estimate.angle
     const growthClass = estimate.growthClass
@@ -251,9 +301,10 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
       confidence,
       aiSummary,
     }
+    const responsePayload = { ...payload, landmarks }
 
     if (!hasDatabaseUrl) {
-      response.status(201).json({ id: randomUUID(), ...payload, createdAt: new Date().toISOString() })
+      response.status(201).json({ id: randomUUID(), ...responsePayload, createdAt: new Date().toISOString() })
       return
     }
 
@@ -264,9 +315,9 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
           angle,
         },
       })
-      response.status(201).json(created)
+      response.status(201).json({ ...created, landmarks })
     } catch {
-      response.status(201).json({ id: randomUUID(), ...payload, createdAt: new Date().toISOString() })
+      response.status(201).json({ id: randomUUID(), ...responsePayload, createdAt: new Date().toISOString() })
     }
   } catch (error) {
     next(error)

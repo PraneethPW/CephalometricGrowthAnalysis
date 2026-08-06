@@ -66,6 +66,7 @@ type AnalysisResult = {
   confidence: number
   aiSummary: string
   createdAt: string
+  landmarks?: CephalometricLandmark[]
 }
 
 type CephalometricLandmark = {
@@ -74,13 +75,6 @@ type CephalometricLandmark = {
   x: number
   y: number
 }
-
-const referenceLandmarks: CephalometricLandmark[] = [
-  { id: 'S', name: 'Sella', x: 315, y: 230 },
-  { id: 'N', name: 'Nasion', x: 510, y: 225 },
-  { id: 'Go', name: 'Gonion', x: 330, y: 370 },
-  { id: 'Me', name: 'Menton', x: 560, y: 442 },
-]
 
 const analysisHistoryKey = 'cephgrow-analysis-history'
 
@@ -210,8 +204,8 @@ function classify(angle: number): GrowthClass {
   return 'Average'
 }
 
-function LandmarkOverlay({ showLabels = true }: { showLabels?: boolean }) {
-  const landmark = (id: CephalometricLandmark['id']) => referenceLandmarks.find((item) => item.id === id)!
+function LandmarkOverlay({ landmarks, showLabels = true }: { landmarks: CephalometricLandmark[]; showLabels?: boolean }) {
+  const landmark = (id: CephalometricLandmark['id']) => landmarks.find((item) => item.id === id)!
   const sella = landmark('S')
   const gonion = landmark('Go')
   const menton = landmark('Me')
@@ -220,7 +214,7 @@ function LandmarkOverlay({ showLabels = true }: { showLabels?: boolean }) {
     <svg className="absolute inset-0 z-10 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none" aria-label="Critical cephalometric landmarks">
       <path d={`M${sella.x} ${sella.y} L${gonion.x} ${gonion.y} L${menton.x} ${menton.y}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
       <path d={`M${gonion.x} ${gonion.y} Q${gonion.x + 24} ${gonion.y - 16} ${gonion.x + 54} ${gonion.y - 4}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-      {referenceLandmarks.map((item) => (
+      {landmarks.map((item) => (
         <g key={item.id}>
           <circle cx={item.x} cy={item.y} r="13" fill="rgba(45,212,191,0.18)" stroke="#5eead4" strokeWidth="1.5" className="ceph-landmark-pulse" />
           <circle cx={item.x} cy={item.y} r="5.5" fill="#2dd4bf" stroke="white" strokeWidth="2" />
@@ -752,6 +746,7 @@ function UploadPage() {
     if (preview) URL.revokeObjectURL(preview)
     setSelectedFile(file)
     setPreview(URL.createObjectURL(file))
+    setAnalysisMode('image-assisted')
     setAnalysisResult(null)
     setError('')
   }
@@ -856,10 +851,10 @@ function UploadPage() {
           </div>
           <div className="relative h-[540px] scanline">
             <CephalogramImage src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
-            {(isGenerating || analysisResult) && <LandmarkOverlay />}
-            {(isGenerating || analysisResult) && (
+            {analysisResult?.landmarks && <LandmarkOverlay landmarks={analysisResult.landmarks} />}
+            {(isGenerating || analysisResult?.landmarks) && (
               <div className="absolute bottom-4 left-4 z-20 rounded-lg border border-teal-300/30 bg-slate-950/80 px-3 py-2 text-xs font-bold text-white backdrop-blur">
-                <div className="flex items-center gap-2 text-teal-200"><MapPin size={14} /> {isGenerating ? 'Highlighting critical landmarks…' : 'Critical landmarks highlighted'}</div>
+                <div className="flex items-center gap-2 text-teal-200"><MapPin size={14} /> {isGenerating ? 'Locating image-specific landmarks…' : 'Image-specific landmarks highlighted'}</div>
                 <div className="mt-1 text-slate-300">S Sella · N Nasion · Go Gonion · Me Menton</div>
               </div>
             )}
@@ -1021,7 +1016,7 @@ function GeneratedVisuals({ imageSrc, result, measurements }: GeneratedVisualPro
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="relative h-72 bg-slate-950 scanline">
             <CephalogramImage src={imageSrc} alt="Generated annotated cephalogram" className="h-full w-full object-cover opacity-85 grayscale" />
-            <LandmarkOverlay showLabels={false} />
+            {result.landmarks && <LandmarkOverlay landmarks={result.landmarks} showLabels={false} />}
             <svg className="absolute inset-0 z-20 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
               <rect x="28" y="28" width="178" height="58" rx="10" fill="rgba(15,23,42,0.72)" />
               <text x="46" y="62" fill="#ffffff" fontSize="24" fontWeight="800">{angle.toFixed(2)} deg</text>
