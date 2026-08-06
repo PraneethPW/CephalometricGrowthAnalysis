@@ -18,6 +18,7 @@ import {
   Loader2,
   Lock,
   LogOut,
+  MapPin,
   Microscope,
   PanelLeft,
   Ruler,
@@ -66,6 +67,20 @@ type AnalysisResult = {
   aiSummary: string
   createdAt: string
 }
+
+type CephalometricLandmark = {
+  id: 'S' | 'N' | 'Go' | 'Me'
+  name: string
+  x: number
+  y: number
+}
+
+const referenceLandmarks: CephalometricLandmark[] = [
+  { id: 'S', name: 'Sella', x: 315, y: 230 },
+  { id: 'N', name: 'Nasion', x: 510, y: 225 },
+  { id: 'Go', name: 'Gonion', x: 330, y: 370 },
+  { id: 'Me', name: 'Menton', x: 560, y: 442 },
+]
 
 const analysisHistoryKey = 'cephgrow-analysis-history'
 
@@ -193,6 +208,30 @@ function classify(angle: number): GrowthClass {
   if (angle <= 27) return 'Horizontal'
   if (angle >= 38) return 'Vertical'
   return 'Average'
+}
+
+function LandmarkOverlay({ showLabels = true }: { showLabels?: boolean }) {
+  const landmark = (id: CephalometricLandmark['id']) => referenceLandmarks.find((item) => item.id === id)!
+  const sella = landmark('S')
+  const gonion = landmark('Go')
+  const menton = landmark('Me')
+
+  return (
+    <svg className="absolute inset-0 z-10 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none" aria-label="Critical cephalometric landmarks">
+      <path d={`M${sella.x} ${sella.y} L${gonion.x} ${gonion.y} L${menton.x} ${menton.y}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path d={`M${gonion.x} ${gonion.y} Q${gonion.x + 24} ${gonion.y - 16} ${gonion.x + 54} ${gonion.y - 4}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      {referenceLandmarks.map((item) => (
+        <g key={item.id}>
+          <circle cx={item.x} cy={item.y} r="13" fill="rgba(45,212,191,0.18)" stroke="#5eead4" strokeWidth="1.5" className="ceph-landmark-pulse" />
+          <circle cx={item.x} cy={item.y} r="5.5" fill="#2dd4bf" stroke="white" strokeWidth="2" />
+          {showLabels && <>
+            <rect x={item.x + 10} y={item.y - 29} width={item.name.length * 7 + 28} height="22" rx="7" fill="rgba(15,23,42,0.82)" />
+            <text x={item.x + 18} y={item.y - 14} fill="#f8fafc" fontSize="12" fontWeight="800">{item.id} · {item.name}</text>
+          </>}
+        </g>
+      ))}
+    </svg>
+  )
 }
 
 function hasWebGlSupport() {
@@ -817,12 +856,13 @@ function UploadPage() {
           </div>
           <div className="relative h-[540px] scanline">
             <CephalogramImage src={preview ?? selectedCase.image} alt="Selected cephalogram" className="h-full w-full object-cover opacity-85" />
-            <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
-              <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <path d="M330 370 L405 370" stroke="#ff4f69" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
-              <path d="M330 370 Q354 356 382 367" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <circle cx="330" cy="370" r="7" fill="#ff4f69" />
-            </svg>
+            {(isGenerating || analysisResult) && <LandmarkOverlay />}
+            {(isGenerating || analysisResult) && (
+              <div className="absolute bottom-4 left-4 z-20 rounded-lg border border-teal-300/30 bg-slate-950/80 px-3 py-2 text-xs font-bold text-white backdrop-blur">
+                <div className="flex items-center gap-2 text-teal-200"><MapPin size={14} /> {isGenerating ? 'Highlighting critical landmarks…' : 'Critical landmarks highlighted'}</div>
+                <div className="mt-1 text-slate-300">S Sella · N Nasion · Go Gonion · Me Menton</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -887,7 +927,7 @@ function UploadPage() {
               {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Wand2 size={18} />}
               {isGenerating ? 'Creating support report...' : 'Generate support report'}
             </button>
-            <p className="mt-3 text-sm leading-6 text-slate-600">A report is generated only from entered measurements. Any attachment must pass a diagnostic lateral-cephalogram check; rejected images produce no result.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">A report is generated only from entered measurements. Landmark highlights support review; verify them clinically. Any attachment must pass a diagnostic lateral-cephalogram check.</p>
           </div>
         </aside>
       </div>
@@ -981,18 +1021,15 @@ function GeneratedVisuals({ imageSrc, result, measurements }: GeneratedVisualPro
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="relative h-72 bg-slate-950 scanline">
             <CephalogramImage src={imageSrc} alt="Generated annotated cephalogram" className="h-full w-full object-cover opacity-85 grayscale" />
-            <svg className="absolute inset-0 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
-              <path d="M315 230 L330 370 L560 442" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <path d="M330 370 L405 370" stroke="#ff4f69" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.7" />
-              <path d="M330 370 Q354 356 382 367" stroke="#ff4f69" strokeWidth="4" fill="none" strokeLinecap="round" />
-              <circle cx="330" cy="370" r="7" fill="#ff4f69" />
+            <LandmarkOverlay showLabels={false} />
+            <svg className="absolute inset-0 z-20 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none">
               <rect x="28" y="28" width="178" height="58" rx="10" fill="rgba(15,23,42,0.72)" />
               <text x="46" y="62" fill="#ffffff" fontSize="24" fontWeight="800">{angle.toFixed(2)} deg</text>
             </svg>
           </div>
           <div className="p-4">
             <h3 className="font-black text-slate-950">Annotated Cephalogram</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Generated overlay showing mandibular plane reference and measured angle marker.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Generated overlay showing the reviewed critical landmark points and mandibular plane reference.</p>
           </div>
         </div>
 
