@@ -106,6 +106,29 @@ button {
   }
 }
 
+.ceph-landmark-pulse {
+  transform-origin: center;
+  animation: landmark-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes landmark-pulse {
+  0%,
+  100% {
+    opacity: 0.52;
+    transform: scale(0.78);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ceph-landmark-pulse {
+    animation: none;
+  }
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
