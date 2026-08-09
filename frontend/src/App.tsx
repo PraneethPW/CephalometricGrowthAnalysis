@@ -205,19 +205,27 @@ function classify(angle: number): GrowthClass {
 }
 
 function LandmarkOverlay({ landmarks, showLabels = true }: { landmarks: CephalometricLandmark[]; showLabels?: boolean }) {
+  const [activeId, setActiveId] = useState<CephalometricLandmark['id'] | null>(null)
   const landmark = (id: CephalometricLandmark['id']) => landmarks.find((item) => item.id === id)!
   const sella = landmark('S')
   const gonion = landmark('Go')
   const menton = landmark('Me')
+  const detail: Record<CephalometricLandmark['id'], { color: string; quote: string }> = {
+    S: { color: '#2563eb', quote: 'Sella anchors the cranial-base reference for angular comparisons.' },
+    N: { color: '#06b6d4', quote: 'Nasion establishes the anterior cranial-base direction for profile measurements.' },
+    Go: { color: '#f97316', quote: 'Gonion defines the mandibular angle and is critical for mandibular-plane tracing.' },
+    Me: { color: '#e11d48', quote: 'Menton is the inferior chin landmark used in vertical and mandibular-plane assessment.' },
+  }
 
   return (
     <svg className="absolute inset-0 z-10 h-full w-full" viewBox="0 0 700 520" preserveAspectRatio="none" aria-label="Critical cephalometric landmarks">
       <path d={`M${sella.x} ${sella.y} L${gonion.x} ${gonion.y} L${menton.x} ${menton.y}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
       <path d={`M${gonion.x} ${gonion.y} Q${gonion.x + 24} ${gonion.y - 16} ${gonion.x + 54} ${gonion.y - 4}`} stroke="#fb923c" strokeWidth="3.5" fill="none" strokeLinecap="round" />
       {landmarks.map((item) => (
-        <g key={item.id}>
-          <circle cx={item.x} cy={item.y} r="13" fill="rgba(45,212,191,0.18)" stroke="#5eead4" strokeWidth="1.5" className="ceph-landmark-pulse" />
-          <circle cx={item.x} cy={item.y} r="5.5" fill="#2dd4bf" stroke="white" strokeWidth="2" />
+        <g key={item.id} tabIndex={0} role="button" aria-label={`${item.name}: ${detail[item.id].quote}`} onMouseEnter={() => setActiveId(item.id)} onMouseLeave={() => setActiveId(null)} onFocus={() => setActiveId(item.id)} onBlur={() => setActiveId(null)}>
+          <title>{item.name}: {detail[item.id].quote}</title>
+          <circle cx={item.x} cy={item.y} r={activeId === item.id ? "17" : "13"} fill={`${detail[item.id].color}30`} stroke={detail[item.id].color} strokeWidth="2" className="ceph-landmark-pulse" />
+          <circle cx={item.x} cy={item.y} r="6" fill={detail[item.id].color} stroke="white" strokeWidth="2.5" />
           {showLabels && <>
             <rect x={item.x + 10} y={item.y - 29} width={item.name.length * 7 + 28} height="22" rx="7" fill="rgba(15,23,42,0.82)" />
             <text x={item.x + 18} y={item.y - 14} fill="#f8fafc" fontSize="12" fontWeight="800">{item.id} · {item.name}</text>
@@ -260,6 +268,52 @@ function CephalogramImage({ src, alt, className }: { src: string; alt: string; c
   }
 
   return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
+}
+
+type Landmark = { id: string; name: string; x: number; y: number; tone: string; size: string; importance: string }
+
+const referenceLandmarks: Landmark[] = [
+  { id: 'sella', name: 'Sella', x: 41, y: 37, tone: 'bg-blue-600', size: 'h-4 w-4', importance: '“Sella anchors the cranial-base reference used for angular comparisons.”' },
+  { id: 'nasion', name: 'Nasion', x: 68, y: 40, tone: 'bg-cyan-500', size: 'h-4 w-4', importance: '“Nasion establishes the anterior cranial-base direction for profile measurements.”' },
+  { id: 'a-point', name: 'A point', x: 69, y: 57, tone: 'bg-orange-500', size: 'h-5 w-5', importance: '“A point helps describe the maxillary skeletal reference.”' },
+  { id: 'b-point', name: 'B point', x: 68, y: 65, tone: 'bg-amber-500', size: 'h-5 w-5', importance: '“B point supports mandibular skeletal relationship assessment.”' },
+  { id: 'gonion', name: 'Gonion', x: 50, y: 71, tone: 'bg-fuchsia-600', size: 'h-5 w-5', importance: '“Gonion defines the mandibular angle and contributes to mandibular-plane tracing.”' },
+  { id: 'menton', name: 'Menton', x: 63, y: 79, tone: 'bg-red-500', size: 'h-5 w-5', importance: '“Menton is the inferior chin landmark used in vertical and mandibular-plane assessment.”' },
+  { id: 'pogonion', name: 'Pogonion', x: 73, y: 70, tone: 'bg-violet-600', size: 'h-4 w-4', importance: '“Pogonion is the most anterior chin point for facial-profile assessment.”' },
+]
+
+export function ReferenceLandmarkOverlay({ visible }: { visible: boolean }) {
+  const [active, setActive] = useState<Landmark | null>(null)
+  if (!visible) return null
+
+  return (
+    <>
+      {referenceLandmarks.map((landmark) => (
+        <button
+          key={landmark.id}
+          type="button"
+          aria-label={`${landmark.name}: ${landmark.importance}`}
+          onMouseEnter={() => setActive(landmark)}
+          onMouseLeave={() => setActive(null)}
+          onFocus={() => setActive(landmark)}
+          onBlur={() => setActive(null)}
+          onClick={() => setActive(active?.id === landmark.id ? null : landmark)}
+          className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full ${landmark.size} ${landmark.tone} border-2 border-white shadow-[0_0_0_3px_rgba(15,23,42,0.5)] transition hover:scale-125 focus:scale-125 focus:outline-none`}
+          style={{ left: `${landmark.x}%`, top: `${landmark.y}%` }}
+        />
+      ))}
+      <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-1 rounded-lg bg-slate-950/80 p-2 text-[10px] font-bold text-white backdrop-blur">
+        <span className="mr-1 text-orange-200">Reference landmarks</span>
+        {referenceLandmarks.map((landmark) => <span key={landmark.id} className={`h-2.5 w-2.5 rounded-full ${landmark.tone}`} />)}
+      </div>
+      {active && (
+        <div className="absolute z-20 max-w-60 rounded-lg border border-orange-200 bg-white px-3 py-2 text-left text-xs font-semibold leading-5 text-slate-800 shadow-xl" style={{ left: `${Math.min(active.x + 3, 66)}%`, top: `${Math.max(active.y - 12, 7)}%` }}>
+          <div className="font-black text-blue-700">{active.name}</div>
+          {active.importance}
+        </div>
+      )}
+    </>
+  )
 }
 
 function AuthProvider({ children }: { children: React.ReactNode }) {

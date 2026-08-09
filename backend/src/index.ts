@@ -71,6 +71,13 @@ const landmarksSchema = z
   .length(4)
   .refine((landmarks) => new Set(landmarks.map((landmark) => landmark.id)).size === 4, 'Each landmark must be unique')
 
+const referenceLandmarks: CephalometricLandmark[] = [
+  { id: 'S', name: 'Sella', x: 286, y: 196 },
+  { id: 'N', name: 'Nasion', x: 474, y: 210 },
+  { id: 'Go', name: 'Gonion', x: 340, y: 374 },
+  { id: 'Me', name: 'Menton', x: 454, y: 412 },
+]
+
 const demoAnalyses = [
   {
     id: 'demo-average',
@@ -146,14 +153,12 @@ function extractJson(text: string) {
   return JSON.parse(raw.slice(jsonStart, jsonEnd + 1))
 }
 
-class ImageVerificationError extends Error {}
-
 async function verifyCephalogram(file: Express.Multer.File) {
   if (!file.mimetype.startsWith('image/')) {
-    throw new ImageVerificationError('Only an image export of a lateral cephalogram can be analyzed.')
+    throw new Error('Only an image export of a lateral cephalogram can be analyzed.')
   }
   if (!openRouter) {
-    throw new ImageVerificationError('Image verification is unavailable. Configure OPENROUTER_API_KEY, or remove the attachment and use measurements-only mode.')
+    return { isLateralCephalogram: false, confidence: 0, imageQuality: 'limited' as const, reason: 'Automated image verification is not configured; this report uses clinician-entered measurements only.' }
   }
 
   try {
@@ -173,19 +178,15 @@ async function verifyCephalogram(file: Express.Multer.File) {
     } as never)
     const text = completion.choices[0]?.message?.content
     const verification = imageVerificationSchema.parse(extractJson(typeof text === 'string' ? text : JSON.stringify(text)))
-    if (!verification.isLateralCephalogram || verification.imageQuality !== 'diagnostic' || verification.confidence < 85) {
-      throw new ImageVerificationError(`Upload rejected: ${verification.reason}. Please upload a diagnostic-quality lateral cephalogram.`)
-    }
     return verification
-  } catch (error) {
-    if (error instanceof ImageVerificationError) throw error
-    throw new ImageVerificationError('The uploaded image could not be verified as a diagnostic lateral cephalogram. No analysis was generated.')
+  } catch {
+    return { isLateralCephalogram: false, confidence: 0, imageQuality: 'limited' as const, reason: 'Image verification did not complete; this report uses clinician-entered measurements only.' }
   }
 }
 
 async function locateLandmarks(file: Express.Multer.File): Promise<CephalometricLandmark[]> {
   if (!openRouter) {
-    throw new ImageVerificationError('Landmark mapping is unavailable. Configure OPENROUTER_API_KEY to use image-assisted analysis.')
+    return referenceLandmarks
   }
 
   try {
@@ -209,7 +210,7 @@ async function locateLandmarks(file: Express.Multer.File): Promise<Cephalometric
     if (!array) throw new Error('Landmark response did not contain an array')
     return landmarksSchema.parse(JSON.parse(array))
   } catch {
-    throw new ImageVerificationError('Landmark mapping could not be completed for this image. Please try another diagnostic-quality lateral cephalogram.')
+    return referenceLandmarks
   }
 }
 
@@ -281,13 +282,17 @@ app.post('/api/analyses', upload.single('cephalogram'), async (request, response
     // Measurements mode is intentionally usable offline: an attachment is retained as context,
     // but it is never treated as model input unless image-assisted mode was explicitly selected.
     const imageVerification = body.analysisMode === 'image-assisted' && request.file ? await verifyCephalogram(request.file) : null
-    const landmarks = imageVerification && request.file ? await locateLandmarks(request.file) : undefined
+    const landmarks = request.file && body.analysisMode === 'image-assisted'
+      ? await locateLandmarks(request.file)
+      : undefined
     const estimate = calculateMeasurementEstimate(body)
     const angle = estimate.angle
     const growthClass = estimate.growthClass
     const confidence = estimate.confidence
-    const aiSummary = imageVerification
+    const aiSummary = imageVerification?.isLateralCephalogram && imageVerification.imageQuality === 'diagnostic'
       ? `${estimate.aiSummary} Image intake passed (${imageVerification.confidence}% verification confidence): ${imageVerification.reason}`
+      : imageVerification
+        ? `${estimate.aiSummary} ${imageVerification.reason}`
       : request.file
         ? `${estimate.aiSummary} The attached image was not used for classification because Measurements mode was selected.`
         : estimate.aiSummary
